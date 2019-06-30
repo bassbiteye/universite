@@ -17,6 +17,8 @@ class EtudiantService
     $this->db_host = $db_host;
   }
 
+    
+
   public function getPDO()
   {
     if ($this->pdo === null) {
@@ -26,25 +28,38 @@ class EtudiantService
     }
     return $this->pdo;
   }
+  public function   findAllc()
+  {
+    $req = $this->getPDO()->query("SELECT c.id_chambre, c.nom_chambre ,b.nom_bat,b.id_batiment FROM chambre c,batiment  b where c.id_batiment=b.id_batiment  ORDER BY c.id_batiment ASC");
+    return $req->fetchAll(PDO::FETCH_OBJ);
+  }
+
   public function   findAll($table)
   {
     $req = $this->getPDO()->query("SELECT * FROM $table ");
     return $req->fetchAll(PDO::FETCH_OBJ);
   }
 
-  /*   function getEtudiantByMatricule($Matricule)
+  public function   findval($col,$val)
   {
-    $id = 0;
-    $req = $this->getPDO()->query("SELECT * FROM Etudiant WHERE matricule = '$Matricule'");
-    $data = $req->fetchAll(PDO::FETCH_CLASS);
-    foreach ($data as $donne) {
-      $id = $donne->id_etudiant;
-      var_dump($id);
-    }
-
-    return $id;
-  } */
+   
+    $req = $this->getPDO()->query("SELECT * FROM Etudiant  where " .$col ." = "."'$val'");
+   
+    return $req->fetchAll(PDO::FETCH_OBJ);
+  }
   //etudiant
+  function getidEtu()
+  {
+
+    $req = $this->getPDO()->query("SELECT * FROM Etudiant where id_etudiant = (SELECT MAX(id_etudiant) FROM Etudiant)");
+    return $req->fetchAll(PDO::FETCH_OBJ);
+  }
+  public function   getChambreByBAT($id)
+  {
+    $req = $this->getPDO()->query("SELECT * FROM chambre where id_batiment= '$id' ");
+    $chambre = $req->fetchAll(PDO::FETCH_OBJ);
+    echo json_encode($chambre);
+  }
   public function   add(Etudiant $etudiant)
   {
     $matricule = $etudiant->getMatricule();
@@ -66,28 +81,61 @@ class EtudiantService
     }
     if (get_class($etudiant) == 'Boursier' || get_class($etudiant) == 'Loger') {
       $id_type = $etudiant->getId_type();
-      var_dump($id_etudiant);
+      //var_dump($id_etudiant);
       $statement = $this->getPDO()->prepare("INSERT INTO boursier (id_etudiant,id_type )
       VALUES (:id_etudiant,:id_type)");
       $statement->execute(array('id_etudiant' => $id_etudiant, 'id_type' => $id_type));
       if (get_class($etudiant) == 'Loger') {
         $chambre = $etudiant->getChambre();
-  
-        var_dump($chambre);
+
+        // var_dump($chambre);
         $statement = $this->getPDO()->prepare("INSERT INTO loger (id_etudiant,id_chambre)
         VALUES (:id_etudiant,:id_chambre)");
         $statement->execute(array('id_etudiant' => $id_etudiant, 'id_chambre' => $chambre));
+        var_dump($statement);
       }
-    }  else if (get_class($etudiant) == 'NonBoursier') {
+    } else if (get_class($etudiant) == 'NonBoursier') {
       $adresse = $etudiant->getAdresse();
 
-      var_dump($id_etudiant);
+      // var_dump($id_etudiant);
       $statement = $this->getPDO()->prepare("INSERT INTO non_boursier (id_etudiant,adresse )
       VALUES (:id_etudiant,:adresse)");
-      $statement->execute(array('id_etudiant' => $id_etudiant, 'id_type' => $adresse));
+      $statement->execute(array('id_etudiant' => $id_etudiant, 'adresse' => $adresse));
     }
   }
+public function editE(Etudiant $etudiant,$id){
 
+
+  $matricule = $etudiant->getMatricule();
+  $nom = $etudiant->getNom();
+  $prenom = $etudiant->getPrenom();
+  $email = $etudiant->getEmail();
+  $tel = $etudiant->getTelephone();
+  $date = $etudiant->getDatenaissance();
+  $sql = "UPDATE Etudiant
+  SET nom = '$nom',prenom='$prenom',email='$email',telephone='$tel',date_naissance='$date' 
+  WHERE id_etudiant='$id'";
+
+
+ // Prepare statement
+ $req = $this->getPDO()->prepare($sql);
+
+ // execute the query
+ $req->execute();
+
+}
+public function deleteE($id)
+{
+  // sql to delete a record
+  $req = "DELETE FROM Etudiant WHERE id_etudiant='$id'";
+
+  // use exec() because no results are returned
+  $req = $this->getPDO()->exec($req);
+
+  //if($req)
+  //echo 'suppression reuissit';
+  // return $id;
+}
   public function   findE($colonne)
   {
     $resultat = $this->getPDO()->query("SELECT * FROM Etudiant 
@@ -99,74 +147,88 @@ class EtudiantService
     or date_naissance ='$colonne' ");
     return  $resultat->fetchAll(PDO::FETCH_OBJ);
   }
-//find etudiant
-public function   NonBoursier() {
-   
-  $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
+  //find etudiant
+  public function   NonBoursier()
+  {
+
+    $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
   ,e.prenom as prenom ,e.email as email,e.telephone as telephone ,
   e.date_naissance as date_naissance ,n.adresse  as adresse
    FROM Etudiant e,non_boursier n
-    where  e.id_etudiant =n.id_etudiant") ; 
-   return  $resultat->fetchAll(PDO::FETCH_OBJ);
-  
-}
-public function loger(){
-  $resultat = $this->getPDO()->query("SELECT  DISTINCT Etudiant.matricule as matricule,
+    where  e.id_etudiant =n.id_etudiant");
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
+  }
+  public function loger()
+  {
+    $resultat = $this->getPDO()->query("SELECT  DISTINCT Etudiant.matricule as mat,
   Etudiant.nom as nom, Etudiant.prenom as prenom,
-  Etudiant.telephone as tel , Etudiant.email as mail,
+  Etudiant.telephone as telephone , Etudiant.email as email,
   Etudiant.date_naissance as date_naissance, 
   type.libelle  as type_bourse,
-   type.montant as montant, chambre.id_chambre as chambre, batiment.nom_bat as batiment
+   type.montant as montant, chambre.nom_chambre as chambre, batiment.nom_bat as batiment
  FROM Etudiant, type, loger, chambre, batiment, boursier
-WHERE Etudiant.matricule = boursier.id_etudiant
+WHERE Etudiant.id_etudiant = boursier.id_etudiant
 AND loger.id_etudiant=boursier.id_etudiant
 AND type.id_type=boursier.id_type
 AND loger.id_chambre=chambre.id_chambre
 AND chambre.id_batiment=batiment.id_batiment ");
-     return  $resultat->fetchAll(PDO::FETCH_OBJ);     
-}
-public function boursier(){
-  $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
+  }
+  public function boursier()
+  {
+    $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
   ,e.prenom as prenom ,e.email as email,e.telephone as telephone ,
   e.date_naissance as date_naissance,t.libelle as libelle,t.montant  
   FROM Etudiant e,boursier b,type t 
    where e.id_etudiant =b.id_etudiant and t.id_type=b.id_type");
-   return  $resultat->fetchAll(PDO::FETCH_OBJ);
-}
-///check status
-  public function   checkBoursier($matriclue)
-  {
-    $resultat = $this->getPDO()->query("SELECT * 
-   FROM Etudiant e,boursier b
-    where  e.matricule ='$matriclue' and e.id_etudiant =b.id_etudiant ");
     return  $resultat->fetchAll(PDO::FETCH_OBJ);
   }
-  public function   checkLoger($matriclue){
-    $resultat = $this->getPDO()->query("SELECT * 
-    FROM Etudiant e,loger l
-     where  e.matricule ='$matriclue' and e.id_etudiant =l.id_etudiant ");
-     return  $resultat->fetchAll(PDO::FETCH_OBJ);     
-     
+  ///check status
+  public function   checkBoursier($matriclue)
+  {
+    $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
+    ,e.prenom as prenom ,e.email as email,e.telephone as telephone ,
+    e.date_naissance as date_naissance,t.libelle as libelle,t.montant  
+    FROM    Etudiant e,boursier b,type t 
+     where e.matricule ='$matriclue' and e.id_etudiant =b.id_etudiant and t.id_type=b.id_type");
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
   }
-  public function   checkNonBoursier($matriclue) {
-   
-    $resultat = $this->getPDO()->query("SELECT * 
+  public function   checkLoger($matriclue)
+  {
+    $resultat = $this->getPDO()->query("SELECT  DISTINCT Etudiant.matricule as mat,
+    Etudiant.nom as nom, Etudiant.prenom as prenom,
+    Etudiant.telephone as telephone , Etudiant.email as email,
+    Etudiant.date_naissance as date_naissance, 
+    type.libelle  as type_bourse,
+     type.montant as montant, chambre.nom_chambre as chambre, batiment.nom_bat as batiment
+   FROM Etudiant, type, loger, chambre, batiment, boursier
+  WHERE  Etudiant.matricule ='$matriclue' and  Etudiant.id_etudiant = boursier.id_etudiant
+  AND loger.id_etudiant=boursier.id_etudiant
+  AND type.id_type=boursier.id_type
+  AND loger.id_chambre=chambre.id_chambre
+  AND chambre.id_batiment=batiment.id_batiment ");
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
+  }
+  public function   checkNonBoursier($matriclue)
+  {
+    $resultat = $this->getPDO()->query("SELECT e.matricule as mat,e.nom as nom
+    ,e.prenom as prenom ,e.email as email,e.telephone as telephone ,
+    e.date_naissance as date_naissance ,n.adresse  as adresse
      FROM Etudiant e,non_boursier n
-      where  e.matricule ='$matriclue' and e.id_etudiant =n.id_etudiant"); 
-     return  $resultat->fetchAll(PDO::FETCH_OBJ);
-    
+      where  e.matricule ='$matriclue' and e.id_etudiant =n.id_etudiant");
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
   }
   //type
   public function   addType(Type $type)
   {
     $libelle = $type->getLibelle();
     $montant = $type->getMontant();
-  
+
     $statement = $this->getPDO()->prepare("INSERT INTO 
     type (libelle,montant)
     VALUES (:libelle,:montant)");
     $statement->execute(array('libelle' => $libelle, 'montant' => $montant));
-    //return $statement;
+    return $statement;
   }
   public function editType(Type $type, $id)
   {
@@ -183,8 +245,6 @@ public function boursier(){
 
     // execute the query
     $req->execute();
-
-    //$req->execute("UPDATE type SET libelle=$libelle,montant=$montant WHERE id_type=$id");
   }
   public function deleteType($id)
   {
@@ -193,10 +253,8 @@ public function boursier(){
 
     // use exec() because no results are returned
     $req = $this->getPDO()->exec($req);
-  
-   //if($req)
-   //echo 'suppression reuissit';
-   // return $id;
+
+   
   }
   //chambre
   public function   addChambre(Chambre $chambre)
@@ -210,13 +268,13 @@ public function boursier(){
     $statement->execute(array('nom_chambre' => $nom, 'id_batiment' => $bat));
     return $statement;
   }
-  public function editC(Chambre $chambre, $id)
+  public function editCh(Chambre $chambr, $id)
   {
-    $nom = $chambre->getNom_chambre();
-    $bat = $chambre->getBatiment()();
+    $nom = $chambr->getNom_chambre();
+    $bat = $chambr->getBatiment();
 
     $sql = "UPDATE chambre
-     SET libelle = '$nom',montant='$bat'
+     SET nom_chambre = '$nom',id_batiment='$bat'
       WHERE id_chambre='$id'";
     var_dump($sql);
 
@@ -230,16 +288,14 @@ public function boursier(){
   }
   public function deleteC($id)
   {
-    // sql to delete a record
-    $req = "DELETE FROM chambre 
-    WHERE id_chambre='$id'";
+    $sql = 'DELETE FROM chambre '
+      . 'WHERE id_chambre = :id_chambre';
 
-    // use exec() because no results are returned
-    $req = $this->getPDO()->exec($req);
-  
-   //if($req)
-   //echo 'suppression reuissit';
-   // return $id;
+    $stmt = $this->getPDO()->prepare($sql);
+
+    $stmt->execute([':id_chambre' => $id]);
+
+    return $stmt->rowCount();
   }
   //batiment
   public function   addBat(Batiment $bat)
@@ -250,10 +306,10 @@ public function boursier(){
     $statement->execute(array('nom_bat' => $nom_bat));
     return $statement;
   }
- public function  editBat(Batiment $bat, $id)
+  public function  editBat(Batiment $bat, $id)
   {
     $nom_bat = $bat->getNom_bat();
-   
+
 
     $sql = "UPDATE batiment SET nom_bat = '$nom_bat' WHERE id_batiment='$id'";
     var_dump($sql);
@@ -267,15 +323,20 @@ public function boursier(){
     //$req->execute("UPDATE type SET libelle=$libelle,montant=$montant WHERE id_type=$id");
   }
   public function deletebat(Batiment $bat)
-  {$id= $bat->getNom_bat();
-    // sql to delete a record
-    $req = "DELETE FROM batiment WHERE id_batiment='$id'";
+  {
+    $id = $bat->getNom_bat();
+    $sql = 'DELETE FROM batiment '
+      . 'WHERE id_batiment = :id_batiment';
 
-    // use exec() because no results are returned
-    $req = $this->getPDO()->exec($req);
-  
-   //if($req)
-   //echo 'suppression reuissit';
-   // return $id;
+    $stmt = $this->getPDO()->prepare($sql);
+
+    $stmt->execute([':id_batiment' => $id]);
+
+    return $stmt->rowCount();
+  }
+  public function   findBAT()
+  {
+    $resultat = $this->getPDO()->query("SELECT * FROM Batiment");
+    return  $resultat->fetchAll(PDO::FETCH_OBJ);
   }
 }
